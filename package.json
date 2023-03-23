@@ -1,51 +1,59 @@
 {
-  "name": "unblocker",
-  "description": "Web proxy for evading internet censorship & general-purpose library for rewriting remote websites.",
-  "author": "Nathan Friedly - http://nfriedly.com",
-  "version": "2.3.0",
-  "repository": "git://github.com/nfriedly/node-unblocker.git",
-  "engines": {
-    "node": ">=6"
-  },
-  "dependencies": {
-    "async": "^3.1.0",
-    "content-type": "^1.0.4",
-    "cookie": "^0.4.0",
-    "debug": "^4.1.1",
-    "express": "^4.17.1",
-    "iconv-lite": "^0.6.2",
-    "lodash": "^4.17.15",
-    "mime": "^2.4.4",
-    "send": "^0.17.1",
-    "set-cookie-parser": "^2.4.1",
-    "tld": "0.0.2"
-  },
-  "devDependencies": {
-    "concat-stream": "^2.0.0",
-    "eslint": "^7.21.0",
-    "eslint-config-prettier": "^8.1.0",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-prettier": "^3.3.1",
-    "hyperquest": "^2.1.3",
-    "math-helpers": "~0.1.0",
-    "nodemon": "^2.0.2",
-    "prettier": "2.2.1",
-    "tap": "^15.0.5",
-    "ws": "^7.4.4"
-  },
-  "scripts": {
-    "watch": "nodemon --watch ./ --ignore ./examples --ext js,html,xhtml,json --exec npm run test",
-    "test": "npm run lint && npm run test-spec",
-    "pre-commit": "npm run autofix && npm test",
-    "lint": "eslint .",
-    "autofix": "eslint . --fix",
-    "test-spec": "tap --no-coverage test/*spec.js",
-    "test-perf": "node test/performance.js"
-  },
-  "license": "AGPL-3.0",
-  "main": "lib/unblocker.js",
-  "files": [
-    "lib/",
-    "examples/"
-  ]
+ 
+var Unblocker = require('unblocker');
+
+var config = {
+    prefix: '/proxy/',
+    host: null,
+    requestMiddleware: [],
+    responseMiddleware: [],
+    standardMiddleware: false,  // disables all built-in middleware
+    processContentTypes: [
+        'text/html',
+        'application/xml+xhtml',
+        'application/xhtml+xml'
+    ]
 }
+
+var host = Unblocker.host(config);
+var referer = Unblocker.referer(config);
+var cookies = Unblocker.cookies(config);
+var hsts = Unblocker.hsts(config);
+var hpkp = Unblocker.hpkp(config);
+var csp = Unblocker.csp(config);
+var redirects = Unblocker.redirects(config);
+var decompress = Unblocker.decompress(config);
+var charsets = Unblocker.charsets(config);
+var urlPrefixer = Unblocker.urlPrefixer(config);
+var metaRobots = Unblocker.metaRobots(config);
+var contentLength = Unblocker.contentLength(config);
+
+config.requestMiddleware = [
+    host,
+    referer,
+    decompress.handleRequest,
+    cookies.handleRequest
+    // custom requestMiddleware here
+];
+
+config.responseMiddleware = [
+    hsts,
+    hpkp,
+    csp,
+    redirects,
+    decompress.handleResponse,
+    charsets,
+    urlPrefixer,
+    cookies.handleResponse,
+    metaRobots,
+    // custom responseMiddleware here
+    contentLength
+];
+
+var unblocker = new Unblocker(config);
+app.use(unblocker);
+
+// ...
+
+// the upgrade handler allows unblocker to proxy websockets
+app.listen(process.env.PORT || 8080).on('upgrade', unblocker.onUpgrade);
